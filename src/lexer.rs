@@ -1,7 +1,7 @@
 use std::{fs, ops::Range, path::PathBuf};
 use phf::phf_map;
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Tag {
     Invalid,
 
@@ -17,14 +17,14 @@ pub enum Tag {
     NumberLiteral,
 
     // Keywords:
-    Int,
-    Void,
-    Return
+    KInt,
+    KVoid,
+    KReturn
 }
 static TOKEN_KEYWORDS: phf::Map<&'static str, Tag> = phf_map! {
-    "int" => Tag::Int,
-    "void" => Tag::Void,
-    "return" => Tag::Return,
+    "int" => Tag::KInt,
+    "void" => Tag::KVoid,
+    "return" => Tag::KReturn,
 };
 impl Tag {
     fn get_keyword(key: &str) -> Option<Tag> {
@@ -32,12 +32,13 @@ impl Tag {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub struct Token {
     pub tag: Tag,
     pub range: Range<usize>
 }
 
-pub struct Tokenizer {
+pub struct Lexer {
     pub buffer: String,
     index: usize
 }
@@ -48,7 +49,7 @@ enum TokenizerState {
     Int
 }
 
-impl Tokenizer {
+impl Lexer {
     pub fn load(path: &PathBuf) -> Self {
         let buffer = fs::read_to_string(path).expect("Error: unable to read preprocessed file");
         return Self {

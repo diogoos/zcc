@@ -36,9 +36,9 @@ fn main() {
     preprocess.status().expect("GCC Error: failed to preprocess the given input!");
     drop(preprocess);
 
-    let mut tokenizer = lexer::Tokenizer::load(&preprocessed_path);
+    let mut lexer = lexer::Lexer::load(&preprocessed_path);
     loop {
-        let token = tokenizer.next();
+        let token = lexer.next();
         if matches!(token.tag, lexer::Tag::Eof) {
             println!("EOF;");
             break;
@@ -48,7 +48,7 @@ fn main() {
             process::exit(2);
         }
 
-        let str = &tokenizer.buffer[token.range];
+        let str = &lexer.buffer[token.range];
         println!("Found tag of type {:?}; value: '{}'", token.tag, str);
     }
 
