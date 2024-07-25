@@ -1,5 +1,6 @@
 use std::{path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
+mod lexer;
 
 fn main() {
     let matches = command!()
@@ -24,4 +25,19 @@ fn main() {
         process::exit(128);
     }
 
+    let mut tokenizer = lexer::Tokenizer::load(&path);
+    loop {
+        let token = tokenizer.next();
+        if matches!(token.tag, lexer::Tag::Eof) {
+            println!("EOF;");
+            break;
+        }
+        if matches!(token.tag, lexer::Tag::Invalid) {
+            println!("Invalid tag!");
+            process::exit(2);
+        }
+
+        let str = &tokenizer.buffer[token.range];
+        println!("Found tag of type {:?}; value: '{}'", token.tag, str);
+    }
 }
