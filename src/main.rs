@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
 mod lexer;
+mod ast_definitions;
 
 fn main() {
     let matches = command!()
@@ -72,6 +73,7 @@ fn main() {
 
 
     // - 2. Parse the tokens
-
+    let t = ast_definitions::parse_program(&lexer.buffer, tokens);
+    println!("{:#?}", t);
 
 }

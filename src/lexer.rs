@@ -21,6 +21,7 @@ pub enum Tag {
     KVoid,
     KReturn
 }
+pub const KEYWORDS: [Tag; 3] = [Tag::KInt, Tag::KVoid, Tag::KReturn];
 static TOKEN_KEYWORDS: phf::Map<&'static str, Tag> = phf_map! {
     "int" => Tag::KInt,
     "void" => Tag::KVoid,
@@ -32,7 +33,7 @@ impl Tag {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Token {
     pub tag: Tag,
     pub range: Range<usize>
