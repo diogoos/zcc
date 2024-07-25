@@ -1,5 +1,6 @@
-use std::{path::PathBuf, process};
+use std::{fs, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
+mod lexer;
 
 fn main() {
     let matches = command!()
@@ -24,4 +25,21 @@ fn main() {
         process::exit(128);
     }
 
+    // Preprocess the files using GCC (as zcc only acts as a compiler)
+    let preprocessed_path = path.clone().with_extension("i"); // output to same file with `.i` extension
+    let mut preprocess = process::Command::new("gcc");
+    preprocess.arg("-E") // run only the preprocessor
+              .arg("-P") // don't emit linemarkers
+              .arg(path.clone().into_os_string())
+              .arg("-o")
+              .arg(preprocessed_path.clone().into_os_string());
+    preprocess.status().expect("GCC Error: failed to preprocess the given input!");
+    drop(preprocess);
+
+    let tokens = lexer::lex(&preprocessed_path);
+
+    // Erase the preprocessed file before exiting
+    if fs::remove_file(preprocessed_path).is_err() {
+        println!("Failed to remove preprocessed intermediate file.");
+    }   
 }
