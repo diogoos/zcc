@@ -77,26 +77,20 @@ fn main() {
     let mut t = ast::ASTParser::new(lexer.buffer, tokens);
     let result = t.parse();
     match result {
-        Ok(_) => {},
+        Ok(program_vector) => {
+            println!("{:#?}", program_vector);
+        },
         Err(e) => {
             match e {
-                ast::ParserError::UnexpectedToken(msg) => {
-                    println!("Parser error: {}", msg);
+                ast::ASTError::SyntaxError(msg) => {
+                    println!("Syntax error: {}", msg);
                     process::exit(6);
                 },
-                ast::ParserError::UnexpectedEof(msg) => {
-                    println!("Parser error: {}", msg);
-                    process::exit(7);
-                },
-                ast::ParserError::Unknown => {
-                    println!("Parser error: unknown error");
-                    process::exit(8);
+                ast::ASTError::InternalParserError(msg) => {
+                    println!("Internal parser error: {}", msg);
+                    process::exit(9);
                 }
             }            
         }
     }
-
-    // let t = ast_definitions::parse_program(&lexer.buffer, tokens);
-    // println!("{:#?}", t);
-
 }
