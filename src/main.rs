@@ -36,10 +36,24 @@ fn main() {
     preprocess.status().expect("GCC Error: failed to preprocess the given input!");
     drop(preprocess);
 
-    let tokens = lexer::lex(&preprocessed_path);
+    let mut tokenizer = lexer::Tokenizer::load(&preprocessed_path);
+    loop {
+        let token = tokenizer.next();
+        if matches!(token.tag, lexer::Tag::Eof) {
+            println!("EOF;");
+            break;
+        }
+        if matches!(token.tag, lexer::Tag::Invalid) {
+            println!("Invalid tag!");
+            process::exit(2);
+        }
+
+        let str = &tokenizer.buffer[token.range];
+        println!("Found tag of type {:?}; value: '{}'", token.tag, str);
+    }
 
     // Erase the preprocessed file before exiting
     if fs::remove_file(preprocessed_path).is_err() {
         println!("Failed to remove preprocessed intermediate file.");
-    }   
+    }
 }
