@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
 mod lexer;
 mod ast_definitions;
+mod ast;
 
 fn main() {
     let matches = command!()
@@ -73,7 +74,29 @@ fn main() {
 
 
     // - 2. Parse the tokens
-    let t = ast_definitions::parse_program(&lexer.buffer, tokens);
-    println!("{:#?}", t);
+    let mut t = ast::ASTParser::new(lexer.buffer, tokens);
+    let result = t.parse();
+    match result {
+        Ok(_) => {},
+        Err(e) => {
+            match e {
+                ast::ParserError::UnexpectedToken(msg) => {
+                    println!("Parser error: {}", msg);
+                    process::exit(6);
+                },
+                ast::ParserError::UnexpectedEof(msg) => {
+                    println!("Parser error: {}", msg);
+                    process::exit(7);
+                },
+                ast::ParserError::Unknown => {
+                    println!("Parser error: unknown error");
+                    process::exit(8);
+                }
+            }            
+        }
+    }
+
+    // let t = ast_definitions::parse_program(&lexer.buffer, tokens);
+    // println!("{:#?}", t);
 
 }
