@@ -32,7 +32,7 @@ mod ast_tests {
 
                 match &statements[0] {
                     Statement::Return(exp) => {
-                        let exp = exp.as_ref().expect("Return should have expression");
+                        // let exp = exp.as_ref().expect("Return should have expression");
                         match exp {
                             Expression::Int(int_val) => {
                                 assert_eq!(*int_val, "2".to_string());
@@ -55,7 +55,7 @@ mod ast_tests {
 
     #[test]
     fn test_complex() {
-        let buffer = "int custom(void) {\nreturn 500;\nreturn 10;\n}\nvoid two() {\nreturn;\n}".to_string();
+        let buffer = "int custom(void) {\nreturn 500;\nreturn 10;\n}\nvoid two() {\nreturn 5;\n}".to_string();
         let tokens = vec![
             Token { tag: Tag::KInt, range: 0..3 },
             Token { tag: Tag::Identifier, range: 4..10 },
@@ -76,9 +76,10 @@ mod ast_tests {
             Token { tag: Tag::RParen, range: 53..54 },
             Token { tag: Tag::LBrace, range: 55..56 },
             Token { tag: Tag::KReturn, range: 57..63 },
-            Token { tag: Tag::Semicolon, range: 63..64 },
-            Token { tag: Tag::RBrace, range: 65..66 },
-            Token { tag: Tag::Eof, range: 66..66 },
+            Token { tag: Tag::NumberLiteral, range: 64..65},
+            Token { tag: Tag::Semicolon, range: 65..66 },
+            Token { tag: Tag::RBrace, range: 66..67 },
+            Token { tag: Tag::Eof, range: 67..68 },
         ];
         
         let mut parser = ASTParser::new(buffer, tokens);
@@ -94,7 +95,7 @@ mod ast_tests {
 
                 match &statements[0] {
                     Statement::Return(exp) => {
-                        let exp = exp.as_ref().expect("Return should have expression");
+                        // let exp = exp.as_ref().expect("Return should have expression");
                         match exp {
                             Expression::Int(int_val) => {
                                 assert_eq!(*int_val, "500".to_string());
@@ -110,7 +111,7 @@ mod ast_tests {
                 }
 
                 match &statements[1] {
-                    Statement::Return(Some(exp)) => {
+                    Statement::Return(exp) => {
                         match exp {
                             Expression::Int(int_val) => {
                                 assert_eq!(*int_val, "10".to_string());
@@ -119,8 +120,6 @@ mod ast_tests {
                             _ => { panic!("Expression should be of type Return(Int)"); }
                         }
                     }
-                    
-                    _ => { panic!("Statement should be of type Return(Some)"); }
                 }
             },
             
@@ -135,8 +134,15 @@ mod ast_tests {
                 assert_eq!(statements.len(), 1);
 
                 match &statements[0] {
-                    Statement::Return(None) => {},
-                    _ => { panic!("Statement should be of type Return(None)"); }
+                    Statement::Return(exp) => {
+                        match exp {
+                            Expression::Int(int_val) => {
+                                assert_eq!(*int_val, "5".to_string());
+                            }
+                            #[allow(unreachable_patterns)]
+                            _ => { panic!("Expression should be of type Return(Int)"); }
+                        }
+                    }
                 }
             },
             

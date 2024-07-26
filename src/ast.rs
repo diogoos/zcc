@@ -222,21 +222,19 @@ impl<'a> ASTParser<'a> {
                             dprintln!("  * Function owns {} statements", &self.storage.statement_block.len());
                             let mut statements: Vec<Statement> = vec![];
                             for (statement_type, expression_block) in &self.storage.statement_block {
-                                // right now, we only support one 0 or 1 expressions (nothing, or numerical)
+                                // right now, we only support one 1 expression (used in return)
                                 dprintln!("  * Analyzing next statement in queue; owns {} expressions", expression_block.len());
-                                let mut expression_value: Option<Expression> = None;
-                                assert!(expression_block.len() < 2);
-                                if expression_block.len() == 1 {
-                                    match expression_block[0].tag {
-                                        Tag::NumberLiteral => {
-                                            let number_str = &self.buffer[expression_block[0].range.clone()];
-                                            dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
-                                            expression_value = Some(Expression::Int(number_str.to_string()));
-                                        },
+                                let expression_value: Option<Expression>;
+                                assert!(expression_block.len() == 1);
+                                match expression_block[0].tag {
+                                    Tag::NumberLiteral => {
+                                        let number_str = &self.buffer[expression_block[0].range.clone()];
+                                        dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
+                                        expression_value = Some(Expression::Int(number_str.to_string()));
+                                    },
 
-                                        _ => {
-                                            return Err(ASTError::InternalParserError(format!("Unable to parse expression of type `{:?}`", expression_block[0].tag)))
-                                        }
+                                    _ => {
+                                        return Err(ASTError::InternalParserError(format!("Unable to parse expression of type `{:?}`", expression_block[0].tag)))
                                     }
                                 }
 
@@ -244,7 +242,7 @@ impl<'a> ASTParser<'a> {
                                 match statement_type.tag {
                                     Tag::KReturn => {
                                         dprintln!("     * Finished mapping expressions\n     * Built AST Node of `Return` from statement");
-                                        statements.push(Statement::Return(expression_value));
+                                        statements.push(Statement::Return(expression_value.expect("0 expressions found, but 1 is required")));
                                     },
                                     
                                     _ => {
