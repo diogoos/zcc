@@ -1,5 +1,5 @@
 use crate::debug::dprintln;
-use crate::ast_definitions::*;
+use super::ast_definitions::*;
 use crate::lexer::{Tag, Token};
 
 enum ASTParserState {
@@ -292,5 +292,5 @@ impl<'a> ASTParser<'a> {
 }
 
 #[cfg(test)]
-#[path = "./tests/ast_test.rs"]
+#[path = "./test.rs"]
 mod ast_test;

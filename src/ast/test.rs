@@ -1,5 +1,5 @@
 mod ast_tests {
-    use crate::ast::*;
+    use crate::ast::parser::*;
     use crate::lexer::{Tag, Token};
 
     #[test]

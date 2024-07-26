@@ -3,10 +3,13 @@ use clap::{arg, command, ArgAction, ArgGroup};
 mod debug;
 use debug::dprintln;
 
-mod lexer;
-mod ast_definitions;
+mod lex;
 mod ast;
 mod zil;
+
+use lex::lexer;
+use ast::parser;
+
 
 mod assembly_definitions;
 
@@ -76,10 +79,10 @@ fn main() {
 
 
     // - 2. Parse the tokens
-    let mut t = ast::ASTParser::new(lexer.buffer, tokens);
+    let mut t = parser::ASTParser::new(lexer.buffer, tokens);
 
     let result = t.parse();
-    let parsed_tree: Vec<ast_definitions::Program>;
+    let parsed_tree: Vec<ast::ast_definitions::Program>;
     match result {
         Ok(program_tree) => {
             #[cfg(feature="debug_verbose")] ast_definitions::print_program_tree(&program_tree);
@@ -94,11 +97,11 @@ fn main() {
         },
         Err(e) => {
             match e {
-                ast::ASTError::SyntaxError(msg) => {
+                parser::ASTError::SyntaxError(msg) => {
                     println!("Syntax error: {}", msg);
                     process::exit(6);
                 },
-                ast::ASTError::InternalParserError(msg) => {
+                parser::ASTError::InternalParserError(msg) => {
                     println!("Internal parser error: {}", msg);
                     process::exit(9);
                 }
