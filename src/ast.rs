@@ -56,6 +56,7 @@ pub struct ASTParser<'a> {
     is_parsing_function: bool,
 }
 
+#[derive(Debug)]
 pub enum ASTError {
     SyntaxError(String),
     InternalParserError(String)
@@ -93,6 +94,7 @@ impl<'a> ASTParser<'a> {
                         state = S::DeclarationStart;
                         self.storage.current_declaration_type = Some(token.tag.clone());
                     },
+                    Tag::Eof => {}, // pass on EOF
                     _ => {
                         return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected Type keyword, got `{:?}` instead", token.range, token.tag)));
                     }
@@ -290,3 +292,7 @@ impl<'a> ASTParser<'a> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "./tests/ast_test.rs"]
+mod ast_test;
