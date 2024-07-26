@@ -6,6 +6,7 @@ use debug::dprintln;
 mod lexer;
 mod ast_definitions;
 mod ast;
+mod zil;
 
 mod assembly_definitions;
 
