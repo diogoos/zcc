@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, process};
+use std::{fs, io::Write, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
 mod debug;
 use debug::dprintln;
@@ -6,6 +6,8 @@ use debug::dprintln;
 mod lexer;
 mod ast_definitions;
 mod ast;
+
+mod assembly_definitions;
 
 fn main() {
     let matches = command!()
@@ -76,13 +78,18 @@ fn main() {
     let mut t = ast::ASTParser::new(lexer.buffer, tokens);
 
     let result = t.parse();
+    let parsed_tree: Vec<ast_definitions::Program>;
     match result {
         Ok(program_tree) => {
             #[cfg(feature="debug_verbose")] ast_definitions::print_program_tree(&program_tree);
-            _ = program_tree;
-
             dprintln!("Built AST successfully.");
 
+            if matches.get_flag("parse") {
+                process::exit(0);
+            }
+            
+            assert_eq!(program_tree.len(), 1);
+            parsed_tree = program_tree;
         },
         Err(e) => {
             match e {
@@ -96,5 +103,36 @@ fn main() {
                 }
             }            
         }
+    }
+
+    // - 3. Compile the code
+    let assembled = assembly_definitions::ast_to_assembly(&parsed_tree[0]);
+    let code = assembly_definitions::generate_assembly_code(assembled);
+    let should_output = matches.get_flag("assemble");
+
+    // - 3. Assemble and link
+    if matches.get_flag("codegen") && !should_output {
+        process::exit(0);
+    }
+
+    let assembly_path = path.clone().with_extension("s");
+    let output_path = path.clone().with_extension("");
+
+    let mut file_handle = fs::File::create(&assembly_path).expect("IOError: Unable to create output file");
+    write!(file_handle, "{}", code).expect("IOError: Unable to write to output file");
+    
+    if matches.get_flag("codegen") {
+        process::exit(0);
+    }
+
+    let mut assemble = process::Command::new("gcc");
+    assemble.arg(assembly_path.clone().into_os_string())
+              .arg("-o")
+              .arg(&output_path.into_os_string());
+    assemble.status().expect("GCC Error: failed to assemble the output!");
+    drop(assemble);
+
+    if !should_output {
+        fs::remove_file(&assembly_path).expect("IOError: Unable to delete assembly intermediate");
     }
 }
