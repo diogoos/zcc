@@ -1,5 +1,8 @@
 use std::{fs, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
+mod debug;
+use debug::dprintln;
+
 mod lexer;
 mod ast_definitions;
 mod ast;
@@ -14,7 +17,6 @@ fn main() {
         .arg(arg!(parse: --parse "Runs the lexer and parser, but stops before assembly generation").action(ArgAction::SetTrue))
         .arg(arg!(codegen: --codegen "Runs the lexer, parser and assembly generation, but stops before code emission").action(ArgAction::SetTrue))
         .arg(arg!(assemble: -S --assemble "Emits an assembly file (if generated), but does not link it").action(ArgAction::SetTrue))
-        .arg(arg!(verbose: -v --verbose "Verbose output"))
         .group(ArgGroup::new("directives")
                             .args(["lex", "parse", "codegen"])
                             .multiple(false)
@@ -46,7 +48,7 @@ fn main() {
     loop {
         let token = lexer.next();
         if matches!(token.tag, lexer::Tag::Eof) {
-            if matches.get_flag("verbose") { println!("Found EOF;") }
+            dprintln!("Found EOF;");
             break;
         }
         if matches!(token.tag, lexer::Tag::Invalid) {
@@ -55,13 +57,10 @@ fn main() {
             process::exit(2);
         }
 
-        if matches.get_flag("verbose") {
-            let str = &lexer.buffer[token.range.clone()];
-            println!("Found tag of type {:?}; value: '{}'", token.tag, str);
-        }
+        dprintln!("Found tag of type {:?}; value: '{}'", token.tag, &lexer.buffer[token.range.clone()]);
         tokens.push(token);
     }
-    if matches.get_flag("verbose") { println!("Lexed file successfully.") }
+    dprintln!("Lexed file successfully.\n");
 
     // Erase the preprocessed file, as it is no longer necessary
     if fs::remove_file(preprocessed_path).is_err() {
@@ -75,10 +74,15 @@ fn main() {
 
     // - 2. Parse the tokens
     let mut t = ast::ASTParser::new(lexer.buffer, tokens);
+
     let result = t.parse();
     match result {
-        Ok(program_vector) => {
-            println!("{:#?}", program_vector);
+        Ok(program_tree) => {
+            #[cfg(feature="debug_verbose")] ast_definitions::print_program_tree(&program_tree);
+            _ = program_tree;
+
+            dprintln!("Built AST successfully.");
+
         },
         Err(e) => {
             match e {

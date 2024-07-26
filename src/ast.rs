@@ -1,3 +1,4 @@
+use crate::debug::dprintln;
 use crate::ast_definitions::*;
 use crate::lexer::{Tag, Token};
 
@@ -52,7 +53,7 @@ pub struct ASTParser<'a> {
     storage: ASTStore<'a>,
 
     index: usize,
-    is_parsing_function: bool
+    is_parsing_function: bool,
 }
 
 pub enum ASTError {
@@ -73,6 +74,7 @@ impl<'a> ASTParser<'a> {
 
         loop {
             if self.index >= self.tokens.len() {
+                dprintln!("√ Finished parsing all tokens! -- in function? {}", self.is_parsing_function);
                 if self.is_parsing_function {   
                     let function_name: &str = self.storage.current_identifier.unwrap_or("unknown");
                     return Err(ASTError::SyntaxError(format!("Unexpected end of file while parsing function `{}`", function_name)))
@@ -87,6 +89,7 @@ impl<'a> ASTParser<'a> {
             match state {
                 S::Start => match token.tag {
                     Tag::KInt | Tag::KVoid => {
+                        dprintln!("(Re)starting parser. Identified declaration `{:?}`", token.tag);
                         state = S::DeclarationStart;
                         self.storage.current_declaration_type = Some(token.tag.clone());
                     },
@@ -101,6 +104,7 @@ impl<'a> ASTParser<'a> {
 
                         let str = &self.buffer[token.range.clone()];
                         self.storage.current_identifier = Some(str);
+                        dprintln!("Declaration `{:?}`: stored identifier `{}`", self.storage.current_declaration_type, str);
                     },
                     _ => {
                         return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected identifier, got `{:?}` instead", token.range, token.tag)));
@@ -111,6 +115,7 @@ impl<'a> ASTParser<'a> {
                     // if what follows the token declaration is a parenthesis,
                     // declare a new function
                     Tag::LParen => {
+                        dprintln!("Declaration `{}`: found LParen -- treating as function from now on", self.storage.current_identifier.unwrap_or("?unknown?"));
                         state = S::FunctionArguments
                     }
 
@@ -127,11 +132,14 @@ impl<'a> ASTParser<'a> {
                     // TODO: parse arguments in form of:
                     // `int x, int y`
                     // (KInt Identifier) Tag::Comma (KInt Identifier)
-                    Tag::KInt | Tag::KVoid | Tag::Identifier => { },
+                    Tag::KInt | Tag::KVoid | Tag::Identifier => {
+                        dprintln!("Function `{}`: found argument component `{:?}`", self.storage.current_identifier.unwrap_or("?unknown?"), token.tag);
+                    },
                     
 
                     // After all arguments have been declared, only a right (closing) parenthesis can follow
                     Tag::RParen => {
+                        dprintln!("Function `{}`: argument list ended", self.storage.current_identifier.unwrap_or("?unknown?"));
                         state = S::FunctionArgumentsEnded;
                     },
                     _ => {
@@ -142,6 +150,7 @@ impl<'a> ASTParser<'a> {
                 // After a function's arguments have been declared, only a left brace can follow
                 S::FunctionArgumentsEnded => match token.tag {
                     Tag::LBrace => {
+                        dprintln!("Function `{}`: body is beginning; is_parsing_function = true;", self.storage.current_identifier.unwrap_or("?unknown?"));
                         state = S::StatementBody;
                         self.is_parsing_function = true;
                     },
@@ -154,6 +163,7 @@ impl<'a> ASTParser<'a> {
                 // Right now, the only statement we support is `return`
                 S::StatementBody => match token.tag {
                     Tag::KReturn => {
+                        dprintln!("Statement `return` found; function context? {} : {}; current_statement range: {:?}", self.is_parsing_function, self.storage.current_identifier.unwrap_or("none"), token.range);
                         state = S::ExpressionBody;
                         self.storage.current_statement_token = Some(token.clone());
                     },
@@ -166,12 +176,14 @@ impl<'a> ASTParser<'a> {
                     // Right now, the only expression we support is a Number Literal
                     // When we encounter it, store it in the collected current expression
                     Tag::NumberLiteral => {
+                        dprintln!("Expression `NumberLiteral` found; owned by statement `{:?}`; function context? {} : {:?}", self.storage.current_statement_token, self.is_parsing_function, self.storage.current_identifier);
                         self.storage.expression_block.push(token.clone());
                     },
                     
                     // When encountering a semicolon in an expression, finish the collection
                     // and move to ExpressionEnd
                     Tag::Semicolon => {
+                        dprintln!("Expression context ended (;) with {} items: {:?}", self.storage.expression_block.len(), self.storage.expression_block);
                         state = S::ExpressionEnd
                     },
 
@@ -186,10 +198,14 @@ impl<'a> ASTParser<'a> {
                 // (c) the end of the current function, if it exists
                 S::ExpressionEnd => {
                     // at the end of an expression, firstly always close the current block
+                    dprintln!("Closing statement `{:?}`", self.storage.current_statement_token);
+                    dprintln!("  * Statement owns {} expressions", self.storage.expression_block.len());
+                    dprintln!("  * Statement joins {} others in the statement queue", self.storage.statement_block.len());
                     self.storage.close_statement_block();
 
                     match token.tag {
                         Tag::RBrace => { // case (c)
+                            dprintln!("√ Finished parsing function `{}`!", self.storage.current_identifier.unwrap_or("?unknown?"));
                             self.is_parsing_function = false;
                             
                             // add the current function to the program
@@ -201,15 +217,18 @@ impl<'a> ASTParser<'a> {
                             };
 
                             // map the saved statement tokens into AST statements
+                            dprintln!("  * Function owns {} statements", &self.storage.statement_block.len());
                             let mut statements: Vec<Statement> = vec![];
                             for (statement_type, expression_block) in &self.storage.statement_block {
                                 // right now, we only support one 0 or 1 expressions (nothing, or numerical)
+                                dprintln!("  * Analyzing next statement in queue; owns {} expressions", expression_block.len());
                                 let mut expression_value: Option<Expression> = None;
                                 assert!(expression_block.len() < 2);
                                 if expression_block.len() == 1 {
                                     match expression_block[0].tag {
                                         Tag::NumberLiteral => {
                                             let number_str = &self.buffer[expression_block[0].range.clone()];
+                                            dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
                                             expression_value = Some(Expression::Int(number_str.to_string()));
                                         },
 
@@ -222,6 +241,7 @@ impl<'a> ASTParser<'a> {
                                 // right now, we only support the return statement
                                 match statement_type.tag {
                                     Tag::KReturn => {
+                                        dprintln!("     * Finished mapping expressions\n     * Built AST Node of `Return` from statement");
                                         statements.push(Statement::Return(expression_value));
                                     },
                                     
@@ -231,6 +251,8 @@ impl<'a> ASTParser<'a> {
                                 }
                             }
 
+                            dprintln!("Finished building function {:?} with {} AST Statement", function_name, statements.len());
+
                             // Reset statement block
                             self.storage.statement_block = vec![];
 
@@ -238,14 +260,20 @@ impl<'a> ASTParser<'a> {
                             let function_def: FunctionDefinition = (function_name, statements);
                             result.push(Program::Function(function_def));
 
+                            // reset function matching in storage
+                            self.storage.current_declaration_type = None;
+                            self.storage.current_identifier = None;
+
                             // start parsing all over again
                             state = S::Start;
                         }
 
                         _ => {
                             if self.is_parsing_function { // if we are still within a function, case (a)
+                                dprintln!("√ New statement within current function body ({})", self.storage.current_identifier.unwrap_or("?unknown?"));
                                 state = S::StatementBody;
                             } else { // if we are outside a function, case (c)
+                                dprintln!("√ Parsing something new in global scope");
                                 state = S::Start;
                             }
 
