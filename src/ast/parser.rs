@@ -1,5 +1,5 @@
 use crate::debug::dprintln;
-use super::ast_definitions::*;
+use super::symbols::*;
 use crate::lexer::{Tag, Token};
 
 enum ASTParserState {

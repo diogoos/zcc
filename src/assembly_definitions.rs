@@ -27,7 +27,7 @@ impl<'a> Operand<'a> {
     }
 }
 
-use crate::ast::ast_definitions as c;
+use crate::ast::symbols as c;
 pub fn ast_to_assembly<'a>(program: &'a c::Program) -> Construct<'a> {
     match program {
         c::Program::Function((name, statements)) => {

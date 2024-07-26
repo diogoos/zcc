@@ -82,10 +82,10 @@ fn main() {
     let mut t = parser::ASTParser::new(lexer.buffer, tokens);
 
     let result = t.parse();
-    let parsed_tree: Vec<ast::ast_definitions::Program>;
+    let parsed_tree: Vec<ast::symbols::Program>;
     match result {
         Ok(program_tree) => {
-            #[cfg(feature="debug_verbose")] ast_definitions::print_program_tree(&program_tree);
+            #[cfg(feature="debug_verbose")] ast::symbols::print_program_tree(&program_tree);
             dprintln!("Built AST successfully.");
 
             if matches.get_flag("parse") {
