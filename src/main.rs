@@ -82,7 +82,7 @@ fn main() {
     let mut t = parser::ASTParser::new(lexer.buffer, tokens);
 
     let result = t.parse();
-    let parsed_tree: Vec<ast::symbols::Program>;
+    let parsed_tree: ast::symbols::Program;
     match result {
         Ok(program_tree) => {
             #[cfg(feature="debug_verbose")] ast::symbols::print_program_tree(&program_tree);

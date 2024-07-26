@@ -1,74 +1,53 @@
-#[allow(dead_code)]
-enum ASTNodeType { Program, Statement, Expression }
+// AST: Abstract Syntax Tree //
+#![allow(dead_code)]
 
-#[allow(dead_code)]
-trait ASTNode {
-    fn node_type() -> ASTNodeType;
-    fn debug_node_name(&self) -> String;
-}
+// A program consists of many top-level declarations
+pub type Program = Vec<Declaration>;
 
-#[allow(dead_code)]
+// Top-level declarations can be functions,
+// or (TODO) static variables/constants
 #[derive(Debug)]
-pub enum Program<'a> {
-    Function(FunctionDefinition<'a>),
-    // GlobalVariable(VariableDefinition)
-}
-impl<'a> ASTNode for Program<'a> {
-    fn node_type() -> ASTNodeType { ASTNodeType::Program }
-    fn debug_node_name(&self) -> String {
-        match self {
-            Program::Function((name, _)) => format!("Function({})", name)
-        }
-    }
+pub enum Declaration {
+    Function(FunctionDefinition),
 }
 
-pub type FunctionDefinition<'a> = (&'a str, Vec<Statement>);
+// Function consist of a name and multiple internal
+// statements and (TODO) types
+#[derive(Debug)]
+pub struct FunctionDefinition {
+    pub name: String,
+    pub statements: Vec<Statement>
+}
 
-#[allow(dead_code)]
+// Statements called within functions -- this includes
+// a return, or (TODO) a function call, or a variable
+// declaration
 #[derive(Debug)]
 pub enum Statement {
-    Return(Expression),
-    // If(Expression, Box<Statement>, Option<Box<Statement>>)
-}
-impl ASTNode for Statement {
-    fn node_type() -> ASTNodeType { ASTNodeType::Statement }
-    fn debug_node_name(&self) -> String {
-        match self {
-            Statement::Return(_) => format!("Return")
-        }
-    }
+    Return(Expression)
 }
 
-#[allow(dead_code)]
+// Expressions are part of statements and can be 
+// thought of as values -- for example, we return
+// an expression, which could be `8` or `~1`, or `1 + 2`
 #[derive(Debug)]
 pub enum Expression {
-    Int(String)
-}
-impl ASTNode for Expression {
-    fn node_type() -> ASTNodeType { ASTNodeType::Expression }
-    fn debug_node_name(&self) -> String {
-        match self {
-            Expression::Int(val) => format!("Int({})", val)
-        }
-    }
+    Constant(ConstantValue),
+    Unary(UnaryExpressionType, Box<Expression>)
 }
 
-#[allow(dead_code)]
-pub fn print_program_tree<'a>(tree: &Vec<Program<'a>>) {
-    println!("Program root");
-    for program in tree {
-        println!("   |_ {}", program.debug_node_name());
-        match program {
-            Program::Function((_, statements)) => {
-                for statement in statements {
-                    println!("      |_ {}", statement.debug_node_name());
-                    match statement {
-                        Statement::Return(expression) => {
-                            println!("         |_ {}", expression.debug_node_name());
-                        },
-                    }
-                }
-            }
-        }
-    }
+#[derive(Debug)]
+pub enum ConstantValue {
+    Int(String)
+}
+
+// Unary expressions contained within statements
+// and can be complements or negations
+#[derive(Debug)]
+pub enum UnaryExpressionType {
+    Complement, Negation
+}
+
+pub fn print_program_tree<'a>(tree: &Program) {
+    println!("{:#?}", tree);
 }

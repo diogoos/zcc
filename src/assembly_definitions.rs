@@ -28,11 +28,11 @@ impl<'a> Operand<'a> {
 }
 
 use crate::ast::symbols as c;
-pub fn ast_to_assembly<'a>(program: &'a c::Program) -> Construct<'a> {
-    match program {
-        c::Program::Function((name, statements)) => {
-            let instructions = statements_to_instructions(&statements);
-            let function = Construct::Function(name, instructions);
+pub fn ast_to_assembly<'a>(top_level: &'a c::Declaration) -> Construct<'a> {
+    match top_level {
+        c::Declaration::Function(definition) => {
+            let instructions = statements_to_instructions(&definition.statements);
+            let function = Construct::Function(definition.name.as_str(), instructions);
 
             return Construct::Program(Box::new(function));
         }
@@ -48,7 +48,8 @@ fn statements_to_instructions<'a>(statements: &'a Vec<c::Statement>) -> Vec<Inst
                 assert_eq!(idx + 1, statements.len()); // `Return` can only be the last value of a statement list (for now)
                 
                 let left_operand: Operand = match return_value {
-                    c::Expression::Int(str_value) => Operand::Imm(str_value)
+                    c::Expression::Constant(c::ConstantValue::Int(str_value)) => Operand::Imm(str_value),
+                    c::Expression::Unary(_, _) => { panic!("Unary support not yet added"); }
                 };
 
                 instructions.push(Instruction::Mov(left_operand, Operand::Register));

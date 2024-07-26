@@ -26,18 +26,17 @@ mod ast_tests {
         
         let program = &ast[0];
         match program {
-            Program::Function((name, statements)) => {
-                assert_eq!(*name, "main");
-                assert_eq!(statements.len(), 1);
+            Declaration::Function(d) => {
+                assert_eq!(d.name, "main");
+                assert_eq!(d.statements.len(), 1);
 
-                match &statements[0] {
+                match &d.statements[0] {
                     Statement::Return(exp) => {
                         // let exp = exp.as_ref().expect("Return should have expression");
                         match exp {
-                            Expression::Int(int_val) => {
+                            Expression::Constant(ConstantValue::Int(int_val)) => {
                                 assert_eq!(*int_val, "2".to_string());
                             }
-                            #[allow(unreachable_patterns)]
                             _ => { panic!("Expression should be of type Int"); }
                         }
 
@@ -89,18 +88,17 @@ mod ast_tests {
         
         let program1 = &ast[0];
         match program1 {
-            Program::Function((name, statements)) => {
-                assert_eq!(*name, "custom");
-                assert_eq!(statements.len(), 2);
+            Declaration::Function(d) => {
+                assert_eq!(d.name, "custom");
+                assert_eq!(d.statements.len(), 2);
 
-                match &statements[0] {
+                match &d.statements[0] {
                     Statement::Return(exp) => {
                         // let exp = exp.as_ref().expect("Return should have expression");
                         match exp {
-                            Expression::Int(int_val) => {
+                            Expression::Constant(ConstantValue::Int(int_val)) => {
                                 assert_eq!(*int_val, "500".to_string());
-                            }
-                            #[allow(unreachable_patterns)]
+                            },
                             _ => { panic!("Expression should be of type Int"); }
                         }
 
@@ -110,13 +108,12 @@ mod ast_tests {
                     _ => { panic!("Statement should be of type Return"); }
                 }
 
-                match &statements[1] {
+                match &d.statements[1] {
                     Statement::Return(exp) => {
                         match exp {
-                            Expression::Int(int_val) => {
+                            Expression::Constant(ConstantValue::Int(int_val)) => {
                                 assert_eq!(*int_val, "10".to_string());
-                            }
-                            #[allow(unreachable_patterns)]
+                            },
                             _ => { panic!("Expression should be of type Return(Int)"); }
                         }
                     }
@@ -129,17 +126,16 @@ mod ast_tests {
 
         let program2 = &ast[1];
         match program2 {
-            Program::Function((name, statements)) => {
-                assert_eq!(*name, "two");
-                assert_eq!(statements.len(), 1);
+            Declaration::Function(d) => {
+                assert_eq!(d.name, "two");
+                assert_eq!(d.statements.len(), 1);
 
-                match &statements[0] {
+                match &d.statements[0] {
                     Statement::Return(exp) => {
                         match exp {
-                            Expression::Int(int_val) => {
+                            Expression::Constant(ConstantValue::Int(int_val)) => {
                                 assert_eq!(*int_val, "5".to_string());
                             }
-                            #[allow(unreachable_patterns)]
                             _ => { panic!("Expression should be of type Return(Int)"); }
                         }
                     }

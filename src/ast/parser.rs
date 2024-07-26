@@ -67,11 +67,11 @@ impl<'a> ASTParser<'a> {
         Self { buffer, tokens,  storage: ASTStore::empty(), index: 0, is_parsing_function: false }
     }
 
-    pub fn parse(&'a mut self) -> Result<Vec<Program<'a>>, ASTError> {
+    pub fn parse(&'a mut self) -> Result<Program, ASTError> {
         use ASTParserState as S;
 
         let mut state = ASTParserState::Start;
-        let mut result: Vec<Program> = vec![];
+        let mut result: Program = vec![];
 
         loop {
             if self.index >= self.tokens.len() {
@@ -210,55 +210,12 @@ impl<'a> ASTParser<'a> {
                             dprintln!("√ Finished parsing function `{}`!", self.storage.current_identifier.unwrap_or("?unknown?"));
                             self.is_parsing_function = false;
                             
-                            // add the current function to the program
-                            let function_name = match self.storage.current_identifier {
-                                Some(val) => val,
-                                None => {
-                                    return Err(ASTError::InternalParserError(format!("Unable to get storage.current_identifier at S::ExpressionEnd Tag::RBrace")))
-                                }
-                            };
-
-                            // map the saved statement tokens into AST statements
-                            dprintln!("  * Function owns {} statements", &self.storage.statement_block.len());
-                            let mut statements: Vec<Statement> = vec![];
-                            for (statement_type, expression_block) in &self.storage.statement_block {
-                                // right now, we only support one 1 expression (used in return)
-                                dprintln!("  * Analyzing next statement in queue; owns {} expressions", expression_block.len());
-                                let expression_value: Option<Expression>;
-                                assert!(expression_block.len() == 1);
-                                match expression_block[0].tag {
-                                    Tag::NumberLiteral => {
-                                        let number_str = &self.buffer[expression_block[0].range.clone()];
-                                        dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
-                                        expression_value = Some(Expression::Int(number_str.to_string()));
-                                    },
-
-                                    _ => {
-                                        return Err(ASTError::InternalParserError(format!("Unable to parse expression of type `{:?}`", expression_block[0].tag)))
-                                    }
-                                }
-
-                                // right now, we only support the return statement
-                                match statement_type.tag {
-                                    Tag::KReturn => {
-                                        dprintln!("     * Finished mapping expressions\n     * Built AST Node of `Return` from statement");
-                                        statements.push(Statement::Return(expression_value.expect("0 expressions found, but 1 is required")));
-                                    },
-                                    
-                                    _ => {
-                                        return Err(ASTError::InternalParserError(format!("Unable to map statement of type `{:?}`", statement_type.tag)))
-                                    }
-                                }
-                            }
-
-                            dprintln!("Finished building function {:?} with {} AST Statement", function_name, statements.len());
+                            let function_def = self.build_function()?;
+                            dprintln!("Finished building function {:?} with {} AST Statement", function_def.name, function_def.statements.len());
+                            result.push(Declaration::Function(function_def));
 
                             // Reset statement block
                             self.storage.statement_block = vec![];
-
-                            // create a function with the given name and statements
-                            let function_def: FunctionDefinition = (function_name, statements);
-                            result.push(Program::Function(function_def));
 
                             // reset function matching in storage
                             self.storage.current_declaration_type = None;
@@ -288,6 +245,55 @@ impl<'a> ASTParser<'a> {
 
             self.index += 1;
         }
+    }
+
+    fn build_function(&self) -> Result<FunctionDefinition, ASTError> {
+        // add the current function to the program
+        let function_name = match self.storage.current_identifier {
+            Some(val) => val,
+            None => {
+                return Err(ASTError::InternalParserError(format!("Unable to get storage.current_identifier at S::ExpressionEnd Tag::RBrace")))
+            }
+        };
+
+        // map the saved statement tokens into AST statements
+        dprintln!("  * Function owns {} statements", &self.storage.statement_block.len());
+        let mut statements: Vec<Statement> = vec![];
+        for (statement_type, expression_block) in &self.storage.statement_block {
+            // right now, we only support one 1 expression (used in return)
+            dprintln!("  * Analyzing next statement in queue; owns {} expressions", expression_block.len());
+            let expression_value: Option<Expression>;
+            assert!(expression_block.len() == 1);
+            match expression_block[0].tag {
+                Tag::NumberLiteral => {
+                    let number_str = &self.buffer[expression_block[0].range.clone()];
+                    dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
+                    expression_value = Some(Expression::Constant(ConstantValue::Int(number_str.to_string())));
+                },
+
+                _ => {
+                    return Err(ASTError::InternalParserError(format!("Unable to parse expression of type `{:?}`", expression_block[0].tag)))
+                }
+            }
+
+            // right now, we only support the return statement
+            match statement_type.tag {
+                Tag::KReturn => {
+                    dprintln!("     * Finished mapping expressions\n     * Built AST Node of `Return` from statement");
+                    statements.push(Statement::Return(expression_value.expect("0 expressions found, but 1 is required")));
+                },
+                
+                _ => {
+                    return Err(ASTError::InternalParserError(format!("Unable to map statement of type `{:?}`", statement_type.tag)))
+                }
+            }
+        }
+
+
+        return Ok(FunctionDefinition {
+            name: function_name.to_string(),
+            statements
+        });
     }
 }
 
