@@ -92,7 +92,7 @@ impl ASTParser {
                     // If we encounter a left parenthesis after a declaration,
                     // this means it is a function -- parse it and add it to the program
                     Tag::LParen => {
-                        let (new_index, statements) = self.parse_function(index).unwrap();
+                        let (new_index, statements) = self.parse_function(index)?;
                         program.push(Declaration::Function(FunctionDefinition { name: name.to_string(), statements }));
                         index = new_index;
 
@@ -217,14 +217,14 @@ impl ASTParser {
                     };
 
                     index += 1;
-                    let (new_index, subexpression) = self.parse_expression(index).unwrap();
+                    let (new_index, subexpression) = self.parse_expression(index)?;
                     index = new_index;
                     return Ok((index, Expression::Unary(unary_type, Box::new(subexpression))));
                 },
 
                 Tag::LParen => {
                     index += 1;
-                    let (shift, expression) = self.parse_expression(index).unwrap();
+                    let (shift, expression) = self.parse_expression(index)?;
                     index = shift + 1;
                     assert_eq!(self.tokens[index].tag, Tag::RParen);
                     return Ok((index, expression));
@@ -238,3 +238,7 @@ impl ASTParser {
     }
 }
 
+
+#[cfg(test)]
+#[path = "./test.rs"]
+mod ast_test;
