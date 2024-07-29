@@ -208,6 +208,20 @@ impl ASTParser {
                     break Ok((index, Expression::Constant(ConstantValue::Int(value.to_string()))));
                 },
 
+                // Unary operators and their sub expressions
+                Tag::OpNegation | Tag::OpComplement => {
+                    let unary_type = match token.tag {
+                        Tag::OpNegation => UnaryExpressionType::Negation,
+                        Tag::OpComplement => UnaryExpressionType::Complement,
+                        _ => panic!("Internal parser error -- unary type undefined"),
+                    };
+
+                    index += 1;
+                    let (new_index, subexpression) = self.parse_expression(index).unwrap();
+                    index = new_index;
+                    return Ok((index, Expression::Unary(unary_type, Box::new(subexpression))));
+                },
+
                 Tag::LParen => {
                     index += 1;
                     let (shift, expression) = self.parse_expression(index).unwrap();

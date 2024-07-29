@@ -19,7 +19,11 @@ pub enum Tag {
     // Keywords:
     KInt,
     KVoid,
-    KReturn
+    KReturn,
+
+    // Operations
+    OpNegation,
+    OpComplement
 }
 
 static TOKEN_KEYWORDS: phf::Map<&'static str, Tag> = phf_map! {
@@ -132,6 +136,18 @@ impl Lexer {
                     '0'..='9' => {
                         state = S::Int;
                         result.tag = T::NumberLiteral;
+                    },
+
+                    '-' => {
+                        result.tag = T::OpComplement;
+                        self.index += 1;
+                        break;
+                    },
+
+                    '~' => {
+                        result.tag = T::OpNegation;
+                        self.index += 1;
+                        break;
                     },
 
                     // we encountered an invalid token -- return it directly
