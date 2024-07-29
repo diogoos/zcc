@@ -204,4 +204,128 @@ mod ast_tests {
         let mut parser = ASTParser::new(buffer, tokens);
         assert!(parser.parse().is_err());
     }
+
+    #[test]
+    fn test_unary() {
+        let buffer = "int main(void)\n{\nreturn ~-2;\n}";
+        let tokens = vec![
+            Token { tag: Tag::KInt, range: 0..3 },
+            Token { tag: Tag::Identifier, range: 4..8 },
+            Token { tag: Tag::LParen, range: 8..9 },
+            Token { tag: Tag::KVoid, range: 9..13 },
+            Token { tag: Tag::RParen, range: 13..14 },
+            Token { tag: Tag::LBrace, range: 15..16 },
+            Token { tag: Tag::KReturn, range: 17..23 },
+            Token { tag: Tag::OpNegation, range: 24..25 },
+            Token { tag: Tag::OpComplement, range: 25..26 },
+            Token { tag: Tag::NumberLiteral, range: 26..27 },
+            Token { tag: Tag::Semicolon, range: 27..28 },
+            Token { tag: Tag::RBrace, range: 29..30 },
+            Token { tag: Tag::Eof, range: 30..30 },
+        ];
+
+        let mut parser = ASTParser::new(buffer.to_string(), tokens);
+        let ast = parser.parse().expect("Expected result!");
+        check_m2_negation_result(&ast);
+    }
+
+    #[test]
+    fn test_expression_parenthesis() {
+        let buffer = "int main(void)\n{\nreturn ((~(-2)));\n}";
+        let tokens = vec![
+            Token { tag: Tag::KInt, range: 0..3 },
+            Token { tag: Tag::Identifier, range: 4..8 },
+            Token { tag: Tag::LParen, range: 8..9 },
+            Token { tag: Tag::KVoid, range: 9..13 },
+            Token { tag: Tag::RParen, range: 13..14 },
+            Token { tag: Tag::LBrace, range: 15..16 },
+            Token { tag: Tag::KReturn, range: 17..23 },
+            Token { tag: Tag::LParen, range: 24..25 },
+            Token { tag: Tag::LParen, range: 25..26 },
+            Token { tag: Tag::OpNegation, range: 26..27 },
+            Token { tag: Tag::LParen, range: 27..28 },
+            Token { tag: Tag::OpComplement, range: 28..29 },
+            Token { tag: Tag::NumberLiteral, range: 29..30 },
+            Token { tag: Tag::RParen, range: 30..31 },
+            Token { tag: Tag::RParen, range: 31..32 },
+            Token { tag: Tag::RParen, range: 32..33 },
+            Token { tag: Tag::Semicolon, range: 33..34 },
+            Token { tag: Tag::RBrace, range: 35..36 },
+            Token { tag: Tag::Eof, range: 36..36 },
+        ];
+        
+        let mut parser = ASTParser::new(buffer.to_string(), tokens);
+        let ast = parser.parse().expect("Expected result!");
+        check_m2_negation_result(&ast);
+    }
+
+    fn check_m2_negation_result(ast: &Vec<Declaration>) {
+        assert_eq!(ast.len(), 1);
+
+        match &ast[0] {
+            Declaration::Function(d) => {
+                assert_eq!(d.name, "main");
+                assert_eq!(d.statements.len(), 1);
+
+                match &d.statements[0] {
+                    Statement::Return(s1) => {
+                        match s1 {
+                            Expression::Unary(kind, s2) => {
+                                assert!(matches!(kind, UnaryExpressionType::Negation));
+
+                                match *s2.clone() {
+                                    Expression::Unary(kind, s3) => {
+                                        assert!(matches!(kind, UnaryExpressionType::Complement));
+
+                                        match *s3.clone() {
+                                            Expression::Constant(ConstantValue::Int(int_val)) => {
+                                                assert_eq!(*int_val, "2".to_string());
+                                            }
+                                            _ => { panic!("Expected Constant Expression 3"); }
+                                        }
+                                    },
+                                    _ => { panic!("Expected Unary Expression 2"); }
+                                }
+                            },
+                            _ => { panic!("Expected Unary Expression 1"); }
+                        }
+
+                    }
+                    
+                    #[allow(unreachable_patterns)]
+                    _ => { panic!("Statement should be of type Return"); }
+                }
+            },
+            
+            #[allow(unreachable_patterns)]
+            _ => { panic!("AST root node 0 should match Program::Function"); }
+        }   
+    }
+
+    #[test]
+    fn test_expression_unclosed_parenthesis() {
+        let buffer = "int main(void)\n{\nreturn ~((-2);\n}";
+        let tokens = vec![
+            Token { tag: Tag::KInt, range: 0..3 },
+            Token { tag: Tag::Identifier, range: 4..8 },
+            Token { tag: Tag::LParen, range: 8..9 },
+            Token { tag: Tag::KVoid, range: 9..13 },
+            Token { tag: Tag::RParen, range: 13..14 },
+            Token { tag: Tag::LBrace, range: 15..16 },
+            Token { tag: Tag::KReturn, range: 17..23 },
+            Token { tag: Tag::OpNegation, range: 24..25 },
+            Token { tag: Tag::LParen, range: 25..26 },
+            Token { tag: Tag::LParen, range: 26..27 },
+            Token { tag: Tag::OpComplement, range: 27..28 },
+            Token { tag: Tag::NumberLiteral, range: 28..29 },
+            Token { tag: Tag::RParen, range: 29..30 },
+            Token { tag: Tag::Semicolon, range: 30..31 },
+            Token { tag: Tag::RBrace, range: 32..33 },
+            Token { tag: Tag::Eof, range: 33..33 },
+        ];
+
+        let mut parser = ASTParser::new(buffer.to_string(), tokens);
+        assert!(parser.parse().is_err());
+    }
+
 }

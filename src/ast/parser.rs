@@ -157,7 +157,7 @@ impl ASTParser {
                 F::Body => match token.tag {
                     Tag::KReturn => {
                         index += 1;
-                        let (new_index, expression) = self.parse_expression(index).expect("Unable to parse expression");
+                        let (new_index, expression) = self.parse_expression(index)?;
                         statements.push(Statement::Return(expression));
                         index = new_index;
 
@@ -226,7 +226,11 @@ impl ASTParser {
                     index += 1;
                     let (shift, expression) = self.parse_expression(index)?;
                     index = shift + 1;
-                    assert_eq!(self.tokens[index].tag, Tag::RParen);
+
+                    if self.tokens[index].tag != Tag::RParen {
+                        syntax_error!("Unclosed parenthesis at {:?}", self.tokens[index].tag);
+                    }
+
                     return Ok((index, expression));
                 }
 
