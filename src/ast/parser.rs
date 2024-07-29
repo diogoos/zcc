@@ -1,302 +1,226 @@
-use crate::debug::dprintln;
 use super::symbols::*;
 use crate::lexer::{Tag, Token};
 
-enum ASTParserState {
+macro_rules! syntax_error {
+    ($msg:expr) => {
+        return Err(ASTError::SyntaxError($msg.to_string()));
+    };
+    ($msg:expr, $($arg:tt)*) => {
+        return Err(ASTError::SyntaxError(format!($msg, $($arg)*)));
+    };
+}
+
+
+enum ASTParserState<'a> {
     Start,
-    DeclarationStart,
-    DeclarationValue,
-    FunctionArguments,
-    FunctionArgumentsEnded,
-    StatementBody,
-    ExpressionBody,
-    ExpressionEnd
+    DeclarationKind(Tag),
+    Declaration(Tag, &'a str)
 }
 
-struct ASTStore<'a> {
-    statement_block: Vec<(Token, Vec<Token>)>, // [ (Identifier Token, [Expression, Expression])]
-
-    current_statement_token: Option<Token>,
-    expression_block: Vec<Token>,
-
-    current_identifier: Option<&'a str>,
-    current_declaration_type: Option<Tag>,
-}
-impl<'a> ASTStore<'a> {
-    pub fn empty() -> Self {
-        Self {
-            statement_block: vec![],
-
-            current_statement_token: None,
-            expression_block: vec![],
-            
-            current_identifier: None,
-            current_declaration_type: None
-        }
-    }
-
-    pub fn close_statement_block(&mut self) {
-        // There's probably a better way of donig this without cloning...
-        let statement_token = self.current_statement_token.clone().expect("Internal parser storage error: attempted to close statement block without an identifying token");
-        self.current_statement_token = None;
-        let expression_block = self.expression_block.clone();
-        self.expression_block = vec![];
-
-        // Push the block to be dealt with
-        self.statement_block.push((statement_token, expression_block))
-    }
+enum FunctionParserState {
+    Start,
+    ArgumentListStart,
+    ArgumentListEnd,
+    Body,
+    StatementEnd,
+    End
 }
 
-pub struct ASTParser<'a> {
+pub struct ASTParser {
     buffer: String,
-    tokens: Vec<Token>,
-    storage: ASTStore<'a>,
-
-    index: usize,
-    is_parsing_function: bool,
+    tokens: Vec<Token>
 }
 
 #[derive(Debug)]
 pub enum ASTError {
-    SyntaxError(String),
-    InternalParserError(String)
+    SyntaxError(String)
+}
+impl std::fmt::Display for ASTError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SyntaxError(msg) => {
+                return write!(f, "Syntax error: {}", msg);
+            }
+        }
+    }
 }
 
-impl<'a> ASTParser<'a> {
+impl ASTParser {
     pub fn new(buffer: String, tokens: Vec<Token>) -> Self {
-        Self { buffer, tokens,  storage: ASTStore::empty(), index: 0, is_parsing_function: false }
+        Self { buffer, tokens }
     }
 
-    pub fn parse(&'a mut self) -> Result<Program, ASTError> {
+    pub fn parse(&mut self) -> Result<Program, ASTError> {
         use ASTParserState as S;
 
         let mut state = ASTParserState::Start;
-        let mut result: Program = vec![];
+        
+        let mut index: usize = 0;
+        let mut program: Program = vec![];
+
+        let buffer = self.buffer.clone();
+        let buffer = buffer.as_str();
 
         loop {
-            if self.index >= self.tokens.len() {
-                dprintln!("√ Finished parsing all tokens! -- in function? {}", self.is_parsing_function);
-                if self.is_parsing_function {   
-                    let function_name: &str = self.storage.current_identifier.unwrap_or("unknown");
-                    return Err(ASTError::SyntaxError(format!("Unexpected end of file while parsing function `{}`", function_name)))
-                }                
-
-                // finished processing all tokens,
-                // return the current program
-                break Ok(result);
+            if index >= self.tokens.len() {
+                break Ok(program);
             }
-
-            let token = &self.tokens[self.index];
+            
+            let token = &self.tokens[index];
             match state {
                 S::Start => match token.tag {
                     Tag::KInt | Tag::KVoid => {
-                        dprintln!("(Re)starting parser. Identified declaration `{:?}`", token.tag);
-                        state = S::DeclarationStart;
-                        self.storage.current_declaration_type = Some(token.tag.clone());
+                        state = S::DeclarationKind(token.tag.clone())
                     },
-                    Tag::Eof => {}, // pass on EOF
+                    Tag::Eof => {},
                     _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected Type keyword, got `{:?}` instead", token.range, token.tag)));
+                        syntax_error!("Unexpected token at {:?}: expected new declaration, got `{:?}` instead", token.range, token.tag);
                     }
                 },
 
-                S::DeclarationStart => match token.tag {
+                S::DeclarationKind(kind) => match token.tag {
                     Tag::Identifier => {
-                        state = S::DeclarationValue;
-
-                        let str = &self.buffer[token.range.clone()];
-                        self.storage.current_identifier = Some(str);
-                        dprintln!("Declaration `{:?}`: stored identifier `{}`", self.storage.current_declaration_type, str);
+                        let name = &buffer[token.range.clone()];
+                        state = S::Declaration(kind, name);
                     },
                     _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected identifier, got `{:?}` instead", token.range, token.tag)));
+                        syntax_error!("Unexpected token at {:?}: expected declaration identifier, got `{:?}` instead", token.range, token.tag);
                     }
                 },
 
-                S::DeclarationValue => match token.tag {
-                    // if what follows the token declaration is a parenthesis,
-                    // declare a new function
+                S::Declaration(_kind, name) => match token.tag {
+                    // If we encounter a left parenthesis after a declaration,
+                    // this means it is a function -- parse it and add it to the program
                     Tag::LParen => {
-                        dprintln!("Declaration `{}`: found LParen -- treating as function from now on", self.storage.current_identifier.unwrap_or("?unknown?"));
-                        state = S::FunctionArguments
-                    }
+                        let (new_index, statements) = self.parse_function(index).unwrap();
+                        program.push(Declaration::Function(FunctionDefinition { name: name.to_string(), statements }));
+                        index = new_index;
 
-                    // if what follows is an equal sign, create new variable
-                    // TODO
-
-                    // otherwise, error
-                    _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected `(`, got `{:?}` instead", token.range, token.tag)));
-                    }
-                },
-
-                S::FunctionArguments => match token.tag {
-                    // TODO: parse arguments in form of:
-                    // `int x, int y`
-                    // (KInt Identifier) Tag::Comma (KInt Identifier)
-                    Tag::KInt | Tag::KVoid | Tag::Identifier => {
-                        dprintln!("Function `{}`: found argument component `{:?}`", self.storage.current_identifier.unwrap_or("?unknown?"), token.tag);
-                    },
-                    
-
-                    // After all arguments have been declared, only a right (closing) parenthesis can follow
-                    Tag::RParen => {
-                        dprintln!("Function `{}`: argument list ended", self.storage.current_identifier.unwrap_or("?unknown?"));
-                        state = S::FunctionArgumentsEnded;
-                    },
-                    _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected function arguments or `)`, got `{:?}` instead", token.range, token.tag)));
-                    }
-                },
-
-                // After a function's arguments have been declared, only a left brace can follow
-                S::FunctionArgumentsEnded => match token.tag {
-                    Tag::LBrace => {
-                        dprintln!("Function `{}`: body is beginning; is_parsing_function = true;", self.storage.current_identifier.unwrap_or("?unknown?"));
-                        state = S::StatementBody;
-                        self.is_parsing_function = true;
-                    },
-                    _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected `)`, got `{:?}` instead", token.range, token.tag)));
-                    }
-                },
-
-                // Parse the contents of a function, ie. statements
-                // Right now, the only statement we support is `return`
-                S::StatementBody => match token.tag {
-                    Tag::KReturn => {
-                        dprintln!("Statement `return` found; function context? {} : {}; current_statement range: {:?}", self.is_parsing_function, self.storage.current_identifier.unwrap_or("none"), token.range);
-                        state = S::ExpressionBody;
-                        self.storage.current_statement_token = Some(token.clone());
-                    },
-                    _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected statement, got `{:?}` instead", token.range, token.tag)));
-                    }
-                },
-
-                S::ExpressionBody => match token.tag {
-                    // Right now, the only expression we support is a Number Literal
-                    // When we encounter it, store it in the collected current expression
-                    Tag::NumberLiteral => {
-                        dprintln!("Expression `NumberLiteral` found; owned by statement `{:?}`; function context? {} : {:?}", self.storage.current_statement_token, self.is_parsing_function, self.storage.current_identifier);
-                        self.storage.expression_block.push(token.clone());
-                    },
-                    
-                    // When encountering a semicolon in an expression, finish the collection
-                    // and move to ExpressionEnd
-                    Tag::Semicolon => {
-                        dprintln!("Expression context ended (;) with {} items: {:?}", self.storage.expression_block.len(), self.storage.expression_block);
-                        state = S::ExpressionEnd
+                        state = S::Start;
+                        continue;
                     },
 
                     _ => {
-                        return Err(ASTError::SyntaxError(format!("Unexpected token at {:?}: expected expression, got `{:?}` instead", token.range, token.tag)));
-                    }
-                },
-
-                // After an expression has ended, we can have:
-                // (a) another statement inside the current function
-                // (b) another statement in the global context
-                // (c) the end of the current function, if it exists
-                S::ExpressionEnd => {
-                    // at the end of an expression, firstly always close the current block
-                    dprintln!("Closing statement `{:?}`", self.storage.current_statement_token);
-                    dprintln!("  * Statement owns {} expressions", self.storage.expression_block.len());
-                    dprintln!("  * Statement joins {} others in the statement queue", self.storage.statement_block.len());
-                    self.storage.close_statement_block();
-
-                    match token.tag {
-                        Tag::RBrace => { // case (c)
-                            dprintln!("√ Finished parsing function `{}`!", self.storage.current_identifier.unwrap_or("?unknown?"));
-                            self.is_parsing_function = false;
-                            
-                            let function_def = self.build_function()?;
-                            dprintln!("Finished building function {:?} with {} AST Statement", function_def.name, function_def.statements.len());
-                            result.push(Declaration::Function(function_def));
-
-                            // Reset statement block
-                            self.storage.statement_block = vec![];
-
-                            // reset function matching in storage
-                            self.storage.current_declaration_type = None;
-                            self.storage.current_identifier = None;
-
-                            // start parsing all over again
-                            state = S::Start;
-                        }
-
-                        _ => {
-                            if self.is_parsing_function { // if we are still within a function, case (a)
-                                dprintln!("√ New statement within current function body ({})", self.storage.current_identifier.unwrap_or("?unknown?"));
-                                state = S::StatementBody;
-                            } else { // if we are outside a function, case (c)
-                                dprintln!("√ Parsing something new in global scope");
-                                state = S::Start;
-                            }
-
-                            // in case we are starting the parsing over,
-                            // we need to re-evaluate the current token, so continue
-                            // without updating the index
-                            continue; 
-                        }
+                        syntax_error!("Unexpected token at {:?}: expected `(`, got `{:?}` instead", token.range, token.tag);
                     }
                 }
             }
 
-            self.index += 1;
+            index += 1;
         }
     }
 
-    fn build_function(&self) -> Result<FunctionDefinition, ASTError> {
-        // add the current function to the program
-        let function_name = match self.storage.current_identifier {
-            Some(val) => val,
-            None => {
-                return Err(ASTError::InternalParserError(format!("Unable to get storage.current_identifier at S::ExpressionEnd Tag::RBrace")))
-            }
-        };
+    fn parse_function(&mut self, start_index: usize) -> Result<(usize, Vec<Statement>), ASTError> {
+        use FunctionParserState as F;
 
-        // map the saved statement tokens into AST statements
-        dprintln!("  * Function owns {} statements", &self.storage.statement_block.len());
+        let mut index = start_index;
+        let mut state = FunctionParserState::Start;
+
         let mut statements: Vec<Statement> = vec![];
-        for (statement_type, expression_block) in &self.storage.statement_block {
-            // right now, we only support one 1 expression (used in return)
-            dprintln!("  * Analyzing next statement in queue; owns {} expressions", expression_block.len());
-            let expression_value: Option<Expression>;
-            assert!(expression_block.len() == 1);
-            match expression_block[0].tag {
-                Tag::NumberLiteral => {
-                    let number_str = &self.buffer[expression_block[0].range.clone()];
-                    dprintln!("     * Mapping NumberLiteral to AST Node of `Int`; inner value: {}", number_str);
-                    expression_value = Some(Expression::Constant(ConstantValue::Int(number_str.to_string())));
+
+        loop {
+            if index >= self.tokens.len() {
+                syntax_error!("Unexpected end of file while parsing function");
+            }
+            
+            let token = &self.tokens[index];
+
+            match state {
+                F::Start => match token.tag {
+                    Tag::LParen => {
+                        state = F::ArgumentListStart;
+                    }
+                    _ => {
+                        syntax_error!("Expected argument list following declaration at {:?}; got `{:?}` instead", token.range, token.tag);
+                    }
                 },
 
-                _ => {
-                    return Err(ASTError::InternalParserError(format!("Unable to parse expression of type `{:?}`", expression_block[0].tag)))
+                F::ArgumentListStart => match token.tag {
+                    Tag::KVoid => {},
+                    Tag::RParen => {
+                        state = F::ArgumentListEnd;
+                    }
+                    _ => {
+                        syntax_error!("Unexpected token `{:?}` in argument list", token.tag);
+                    }
+                },
+
+                F::ArgumentListEnd => match token.tag {
+                    Tag::LBrace => {
+                        state = F::Body;
+                    },
+                    _ => {
+                        syntax_error!("Unexpected token `{:?}` after argument list", token.tag);
+                    }
+                },
+
+                F::Body => match token.tag {
+                    Tag::KReturn => {
+                        index += 1;
+                        let (new_index, expression) = self.parse_expression(index).expect("Unable to parse expression");
+                        statements.push(Statement::Return(expression));
+                        index = new_index;
+
+                        state = F::StatementEnd;
+                    },
+
+                    Tag::RBrace => {
+                        state = F::End;
+                        continue;
+                    }
+
+                    _ => {
+                        syntax_error!("Unexpected token `{:?}` in function body", token.tag);
+                    }
+                },
+
+                F::StatementEnd => match token.tag {
+                    Tag::Semicolon => {
+                        state = F::Body;
+                    },
+                    _ => {
+                        syntax_error!("Expected semicolon after expression -- found `{:?} instead", token.tag);
+                    }
+                },
+
+                F::End => {
+                    break Ok((index + 1, statements))
                 }
             }
 
-            // right now, we only support the return statement
-            match statement_type.tag {
-                Tag::KReturn => {
-                    dprintln!("     * Finished mapping expressions\n     * Built AST Node of `Return` from statement");
-                    statements.push(Statement::Return(expression_value.expect("0 expressions found, but 1 is required")));
+            index += 1;
+        }
+    }
+
+    fn parse_expression(&mut self, index: usize) -> Result<(usize, Expression), ASTError> {
+        let mut index = index;
+
+        loop {
+            if index >= self.tokens.len() {
+                syntax_error!("Unexpected end of file while parsing expression");
+            }
+            
+            let token = &self.tokens[index];
+
+            match token.tag {
+                Tag::NumberLiteral => {
+                    let value = &self.buffer[token.range.clone()];
+                    break Ok((index, Expression::Constant(ConstantValue::Int(value.to_string()))));
                 },
-                
+
+                Tag::LParen => {
+                    index += 1;
+                    let (shift, expression) = self.parse_expression(index).unwrap();
+                    index = shift + 1;
+                    assert_eq!(self.tokens[index].tag, Tag::RParen);
+                    return Ok((index, expression));
+                }
+
                 _ => {
-                    return Err(ASTError::InternalParserError(format!("Unable to map statement of type `{:?}`", statement_type.tag)))
+                    syntax_error!("Unexpected token `{:?}` in expression", token.tag);
                 }
             }
         }
-
-
-        return Ok(FunctionDefinition {
-            name: function_name.to_string(),
-            statements
-        });
     }
 }
 
-#[cfg(test)]
-#[path = "./test.rs"]
-mod ast_test;

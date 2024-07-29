@@ -1,3 +1,4 @@
+use core::panic;
 use std::{fs, io::Write, path::PathBuf, process};
 use clap::{arg, command, ArgAction, ArgGroup};
 mod debug;
@@ -85,27 +86,17 @@ fn main() {
     let parsed_tree: ast::symbols::Program;
     match result {
         Ok(program_tree) => {
-            #[cfg(feature="debug_verbose")] ast::symbols::print_program_tree(&program_tree);
             dprintln!("Built AST successfully.");
+            dprintln!("{:#?}", &program_tree);
 
             if matches.get_flag("parse") {
                 process::exit(0);
             }
             
-            assert_eq!(program_tree.len(), 1);
             parsed_tree = program_tree;
         },
         Err(e) => {
-            match e {
-                parser::ASTError::SyntaxError(msg) => {
-                    println!("Syntax error: {}", msg);
-                    process::exit(6);
-                },
-                parser::ASTError::InternalParserError(msg) => {
-                    println!("Internal parser error: {}", msg);
-                    process::exit(9);
-                }
-            }            
+            panic!("{}", e);
         }
     }
 

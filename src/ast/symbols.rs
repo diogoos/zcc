@@ -22,7 +22,7 @@ pub struct FunctionDefinition {
 // Statements called within functions -- this includes
 // a return, or (TODO) a function call, or a variable
 // declaration
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Return(Expression)
 }
@@ -30,24 +30,20 @@ pub enum Statement {
 // Expressions are part of statements and can be 
 // thought of as values -- for example, we return
 // an expression, which could be `8` or `~1`, or `1 + 2`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Constant(ConstantValue),
     Unary(UnaryExpressionType, Box<Expression>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConstantValue {
     Int(String)
 }
 
 // Unary expressions contained within statements
 // and can be complements or negations
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryExpressionType {
     Complement, Negation
-}
-
-pub fn print_program_tree<'a>(tree: &Program) {
-    println!("{:#?}", tree);
 }

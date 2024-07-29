@@ -1,7 +1,7 @@
 use std::{fs, ops::Range, path::PathBuf};
 use phf::phf_map;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Copy)]
 pub enum Tag {
     Invalid,
 
