@@ -103,6 +103,8 @@ fn main() {
 
     // - 3. Convert the Tree to Z intermediate language
     let _intermediate: zil::symbols::Program = ast::transpile::parse(ast_tree.clone());
+    dprintln!("\nTranspiled to AST succssfully.");
+    dprintln!("{:#?}", _intermediate);
     if matches.get_flag("tacky") {
         process::exit(0);
     }
