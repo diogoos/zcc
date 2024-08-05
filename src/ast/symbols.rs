@@ -6,14 +6,14 @@ pub type Program = Vec<Declaration>;
 
 // Top-level declarations can be functions,
 // or (TODO) static variables/constants
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Declaration {
     Function(FunctionDefinition),
 }
 
 // Function consist of a name and multiple internal
 // statements and (TODO) types
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionDefinition {
     pub name: String,
     pub statements: Vec<Statement>
@@ -39,6 +39,13 @@ pub enum Expression {
 #[derive(Debug, Clone)]
 pub enum ConstantValue {
     Int(String)
+}
+impl ConstantValue {
+    pub fn inner(&self) -> &String {
+        match self {
+            Self::Int(s) => s
+        }
+    }
 }
 
 // Unary expressions contained within statements

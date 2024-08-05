@@ -6,8 +6,8 @@ pub enum Construct {
 }
 
 pub struct FunctionDefinition {
-    identifier: String,
-    instructions: Vec<Instruction>
+    pub identifier: String,
+    pub instructions: Vec<Instruction>
 }
 
 pub enum Instruction {
@@ -16,9 +16,9 @@ pub enum Instruction {
 }
 
 pub struct UnaryInstructionDefinition {
-    operator: UnaryInstructionOperator,
-    source: Value,
-    destination: Value
+    pub operator: UnaryInstructionOperator,
+    pub source: Value,
+    pub destination: Value
 }
 
 pub enum UnaryInstructionOperator {
@@ -26,6 +26,7 @@ pub enum UnaryInstructionOperator {
     Negate
 }
 
+#[derive(Clone)]
 pub enum Value {
     Constant(String),
     Variable(String)

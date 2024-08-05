@@ -22,6 +22,7 @@ fn main() {
                 )
         .arg(arg!(lex: --lex "Runs the lexer, but stops before parsing").action(ArgAction::SetTrue))
         .arg(arg!(parse: --parse "Runs the lexer and parser, but stops before assembly generation").action(ArgAction::SetTrue))
+        .arg(arg!(tacky: --tacky "Runs the compiler through the ZIL generation stage, stopping before assembly generation").action(ArgAction::SetTrue))
         .arg(arg!(codegen: --codegen "Runs the lexer, parser and assembly generation, but stops before code emission").action(ArgAction::SetTrue))
         .arg(arg!(assemble: -S --assemble "Emits an assembly file (if generated), but does not link it").action(ArgAction::SetTrue))
         .group(ArgGroup::new("directives")
@@ -83,7 +84,7 @@ fn main() {
     let mut t = parser::ASTParser::new(lexer.buffer, tokens);
 
     let result = t.parse();
-    let parsed_tree: ast::symbols::Program;
+    let ast_tree: ast::symbols::Program;
     match result {
         Ok(program_tree) => {
             dprintln!("Built AST successfully.");
@@ -93,19 +94,25 @@ fn main() {
                 process::exit(0);
             }
             
-            parsed_tree = program_tree;
+            ast_tree = program_tree;
         },
         Err(e) => {
             panic!("{}", e);
         }
     }
 
-    // - 3. Compile the code
-    let assembled = assembly_definitions::ast_to_assembly(&parsed_tree[0]);
+    // - 3. Convert the Tree to Z intermediate language
+    let _intermediate: zil::symbols::Program = ast::transpile::parse(ast_tree.clone());
+    if matches.get_flag("tacky") {
+        process::exit(0);
+    }
+
+    // - 4. Compile (TODO: make this use the ZIL `intermediate` instead)
+    let assembled = assembly_definitions::ast_to_assembly(&ast_tree[0]);
     let code = assembly_definitions::generate_assembly_code(assembled);
     let should_output = matches.get_flag("assemble");
 
-    // - 3. Assemble and link
+    // - 5. Assemble and link
     if matches.get_flag("codegen") && !should_output {
         process::exit(0);
     }
