@@ -5,14 +5,11 @@ mod debug;
 use debug::dprintln;
 
 mod lex;
-mod ast;
-mod zil;
-
 use lex::lexer;
+mod ast;
 use ast::parser;
-
-
-mod assembly_definitions;
+mod zil;
+mod assembly;
 
 fn main() {
     let matches = command!()
@@ -102,19 +99,27 @@ fn main() {
     }
 
     // - 3. Convert the Tree to Z intermediate language
-    let _intermediate: zil::symbols::Program = ast::transpile::parse(ast_tree.clone());
-    dprintln!("\nTranspiled to AST succssfully.");
-    dprintln!("{:#?}", _intermediate);
+    let intermediate: zil::symbols::Program = zil::transpile::parse(ast_tree.clone());
+    dprintln!("\nTranspiled to ZIL successfully.");
+    dprintln!("{:#?}", intermediate);
     if matches.get_flag("tacky") {
         process::exit(0);
     }
 
-    // - 4. Compile (TODO: make this use the ZIL `intermediate` instead)
-    let assembled = assembly_definitions::ast_to_assembly(&ast_tree[0]);
-    let code = assembly_definitions::generate_assembly_code(assembled);
-    let should_output = matches.get_flag("assemble");
+    // - 4. Compile ZIL into Assembly
+    let mut transpiler = assembly::transpile::STranspiler::new();
+    let assembled = transpiler.parse(intermediate);
+    dprintln!("\nTranspiled to Assembly successfully.");
+    dprintln!("{:#?}", assembled);
 
-    // - 5. Assemble and link
+
+    // - 5. Codegen from assembly output
+    let code = assembly::agen::codegen(&assembled);
+    let should_output = matches.get_flag("assemble");
+    dprintln!("\nCodegen successful!");
+    dprintln!("{}", code);
+
+    // - 6. Assemble and link
     if matches.get_flag("codegen") && !should_output {
         process::exit(0);
     }
@@ -124,7 +129,7 @@ fn main() {
 
     let mut file_handle = fs::File::create(&assembly_path).expect("IOError: Unable to create output file");
     write!(file_handle, "{}", code).expect("IOError: Unable to write to output file");
-    
+
     if matches.get_flag("codegen") {
         process::exit(0);
     }

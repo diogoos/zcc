@@ -139,13 +139,13 @@ impl Lexer {
                     },
 
                     '-' => {
-                        result.tag = T::OpComplement;
+                        result.tag = T::OpNegation;
                         self.index += 1;
                         break;
                     },
 
                     '~' => {
-                        result.tag = T::OpNegation;
+                        result.tag = T::OpComplement;
                         self.index += 1;
                         break;
                     },

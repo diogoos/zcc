@@ -1,5 +1,5 @@
-use super::symbols as A;
-use crate::zil::symbols::{self as Z, FunctionDefinition};
+use crate::ast::symbols as A;
+use super::symbols as Z;
 
 pub fn parse(program: A::Program) -> Z::Program {
     let mut result = Z::Program::new();
@@ -82,7 +82,7 @@ impl FunctionTranspiler {
 impl Z::Construct {
     fn from_transpiler(t: FunctionTranspiler) -> Self {
         Self::Function(
-            FunctionDefinition {
+            Z::FunctionDefinition {
                 identifier: t.f_name,
                 instructions: t.instructions
             }
